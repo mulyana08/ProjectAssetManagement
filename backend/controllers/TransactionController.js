@@ -568,3 +568,131 @@ export const getTransactionsByAsset = async (req, res) => {
         return errorResponse(res, 'Terjadi kesalahan saat mengambil data transaksi', 500);
     }
 };
+
+/**
+ * Export transactions to CSV
+ * GET /api/transactions/export
+ */
+export const exportTransactions = async (req, res) => {
+    try {
+        const type = req.query.type || '';
+        const startDate = req.query.start_date || '';
+        const endDate = req.query.end_date || '';
+
+        // Build where clause
+        const whereClause = {};
+
+        if (type && Object.values(TRANSACTION_TYPES).includes(type)) {
+            whereClause.type = type;
+        }
+
+        if (startDate && endDate) {
+            whereClause.transaction_date = {
+                [Op.between]: [new Date(startDate), new Date(endDate)]
+            };
+        } else if (startDate) {
+            whereClause.transaction_date = {
+                [Op.gte]: new Date(startDate)
+            };
+        } else if (endDate) {
+            whereClause.transaction_date = {
+                [Op.lte]: new Date(endDate)
+            };
+        }
+
+        const transactions = await Transaction.findAll({
+            where: whereClause,
+            order: [['transaction_date', 'DESC']],
+            include: [
+                {
+                    model: Asset,
+                    as: 'asset',
+                    attributes: ['id', 'asset_code', 'name'],
+                    include: [
+                        { model: Category, as: 'category', attributes: ['id', 'name'] }
+                    ]
+                },
+                {
+                    model: User,
+                    as: 'user',
+                    attributes: ['id', 'name', 'email']
+                },
+                {
+                    model: Location,
+                    as: 'previousLocation',
+                    attributes: ['id', 'name']
+                },
+                {
+                    model: Location,
+                    as: 'newLocation',
+                    attributes: ['id', 'name']
+                }
+            ]
+        });
+
+        // Generate CSV content
+        const headers = [
+            'Tanggal',
+            'Kode Aset',
+            'Nama Aset',
+            'Kategori',
+            'Tipe Transaksi',
+            'Status Sebelum',
+            'Status Sesudah',
+            'Lokasi Sebelum',
+            'Lokasi Sesudah',
+            'Dilakukan Oleh',
+            'Catatan'
+        ];
+
+        const formatDate = (date) => {
+            if (!date) return '-';
+            return new Date(date).toLocaleString('id-ID', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        };
+
+        const escapeCSV = (value) => {
+            if (value === null || value === undefined) return '';
+            const str = String(value);
+            if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        };
+
+        const rows = transactions.map(t => [
+            formatDate(t.transaction_date),
+            t.asset?.asset_code || '-',
+            t.asset?.name || '-',
+            t.asset?.category?.name || '-',
+            t.type || '-',
+            t.previous_status || '-',
+            t.new_status || '-',
+            t.previousLocation?.name || '-',
+            t.newLocation?.name || '-',
+            t.user?.name || '-',
+            t.notes || '-'
+        ].map(escapeCSV).join(','));
+
+        const csvContent = [headers.join(','), ...rows].join('\n');
+
+        // Add BOM for Excel UTF-8 compatibility
+        const bom = '\uFEFF';
+        const csvWithBom = bom + csvContent;
+
+        // Set response headers for CSV download
+        const filename = `transaksi_${new Date().toISOString().split('T')[0]}.csv`;
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        return res.status(200).send(csvWithBom);
+    } catch (error) {
+        console.error('Export transactions error:', error);
+        return errorResponse(res, 'Terjadi kesalahan saat export data transaksi', 500);
+    }
+};
