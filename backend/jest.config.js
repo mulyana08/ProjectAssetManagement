@@ -6,12 +6,8 @@ export default {
   verbose: true,
   forceExit: true,
   detectOpenHandles: true,
-  // CI specific settings
+  // CI specific settings - using --json --outputFile in CLI instead of reporter
   ...(process.env.CI && {
-    reporters: [
-      'default',
-      ['jest-json-reporter', { outputFile: 'test-results.json' }]
-    ],
     coverageReporters: ['text', 'text-summary', 'json-summary'],
     collectCoverage: true,
     coverageDirectory: 'coverage',
