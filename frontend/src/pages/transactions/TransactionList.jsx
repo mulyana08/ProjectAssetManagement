@@ -7,12 +7,15 @@ import {
     Pagination, 
     SearchBar, 
     Select,
-    EmptyState
+    EmptyState,
+    ExportConfirmModal,
+    ExportResultModal
 } from '../../components/common';
 import { ContentLoading } from '../../components/common/Loading';
 import { TransactionTypeBadge, TransactionStatusBadge } from '../../components/common/Badge';
 import { transactionAPI } from '../../api';
 import { formatDateTime } from '../../utils/formatters';
+import { exportTransactionsToPDF, downloadFile, openInNewTab } from '../../utils/pdfExporter';
 import toast from 'react-hot-toast';
 import { 
     HiOutlinePlus, 
@@ -37,7 +40,13 @@ const TransactionList = () => {
         totalPages: 0
     });
     const [isLoading, setIsLoading] = useState(true);
+    const [isExporting, setIsExporting] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
+    
+    // Export modal states
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [showExportResult, setShowExportResult] = useState(false);
+    const [exportResult, setExportResult] = useState({ filename: '', url: '', blob: null });
 
     // Filter State
     const [filters, setFilters] = useState({
@@ -135,6 +144,71 @@ const TransactionList = () => {
 
     const hasActiveFilters = Object.values(filters).some(v => v !== '');
 
+    // Handle export - buka modal pilihan
+    const handleExportClick = () => {
+        setShowExportModal(true);
+    };
+
+    // Handle export berdasarkan format
+    const handleExport = async (format) => {
+        try {
+            setIsExporting(true);
+            setShowExportModal(false);
+
+            if (format === 'pdf') {
+                // Fetch all data for export (tanpa pagination)
+                const response = await transactionAPI.getAll({ 
+                    ...filters, 
+                    limit: 1000 // Get all data
+                });
+                
+                // Response structure: { success, message, data: [] }
+                const allTransactions = response?.data || [];
+                
+                console.log('Transactions for PDF:', allTransactions);
+                
+                if (!allTransactions || allTransactions.length === 0) {
+                    toast.error('Tidak ada data untuk diexport');
+                    return;
+                }
+
+                // Generate PDF
+                const result = await exportTransactionsToPDF(allTransactions, {
+                    title: 'Laporan Transaksi Aset IT',
+                    subtitle: hasActiveFilters ? 'Data Terfilter' : 'Semua Data'
+                });
+
+                setExportResult(result);
+                setShowExportResult(true);
+                toast.success('PDF berhasil dibuat!');
+            } else {
+                // Export CSV (existing functionality)
+                await transactionAPI.exportCSV(filters);
+                toast.success('CSV berhasil diexport');
+            }
+        } catch (error) {
+            console.error('Export error:', error);
+            toast.error('Gagal mengexport data: ' + (error.message || 'Unknown error'));
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    // Handle download file
+    const handleDownload = () => {
+        if (exportResult.blob && exportResult.filename) {
+            downloadFile(exportResult.blob, exportResult.filename);
+        }
+        setShowExportResult(false);
+    };
+
+    // Handle buka file
+    const handleOpenFile = () => {
+        if (exportResult.url) {
+            openInNewTab(exportResult.url);
+        }
+    };
+
     // Table columns
     const columns = [
         {
@@ -205,10 +279,11 @@ const TransactionList = () => {
                     <div className="flex gap-2">
                         <Button
                             variant="secondary"
-                            onClick={() => {/* Export functionality */}}
+                            onClick={handleExportClick}
+                            disabled={isExporting}
                         >
                             <HiOutlineDownload className="w-5 h-5" />
-                            Export
+                            {isExporting ? 'Mengexport...' : 'Export'}
                         </Button>
                         <div className="flex gap-2">
                             <Link to="/transactions/checkout">
@@ -325,6 +400,25 @@ const TransactionList = () => {
                     </>
                 )}
             </div>
+
+            {/* Export Modals */}
+            <ExportConfirmModal
+                isOpen={showExportModal}
+                onClose={() => setShowExportModal(false)}
+                onExport={handleExport}
+                title="Export Transaksi"
+                description="Pilih format export untuk data transaksi"
+                isLoading={isExporting}
+            />
+
+            <ExportResultModal
+                isOpen={showExportResult}
+                onClose={() => setShowExportResult(false)}
+                filename={exportResult.filename}
+                fileUrl={exportResult.url}
+                onDownload={handleDownload}
+                onOpen={handleOpenFile}
+            />
         </MainLayout>
     );
 };

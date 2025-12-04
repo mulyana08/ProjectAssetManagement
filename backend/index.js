@@ -109,12 +109,12 @@ app.use((err, req, res, next) => {
 });
 
 // ==========================================
-// START SERVER
+// START SERVER (only when not testing)
 // ==========================================
 
 const startServer = async () => {
     await connectDatabase();
-    
+
     app.listen(PORT, () => {
         console.log(`\n🚀 Server is running on http://localhost:${PORT}`);
         console.log(`📚 Environment: ${process.env.NODE_ENV || "development"}`);
@@ -122,5 +122,10 @@ const startServer = async () => {
     });
 };
 
-startServer();
+// Avoid starting the server when running tests — tests should import the app directly.
+if (process.env.NODE_ENV !== "test") {
+    startServer();
+}
+
+export default app;
 

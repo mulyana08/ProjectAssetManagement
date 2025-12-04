@@ -35,6 +35,18 @@ const transactionAPI = {
     },
 
     /**
+     * Export transactions to CSV
+     * @param {Object} params - { type, start_date, end_date }
+     */
+    exportCSV: async (params = {}) => {
+        const response = await axiosPrivate.get('/transactions/export', {
+            params,
+            responseType: 'blob'
+        });
+        return response;
+    },
+
+    /**
      * Checkout asset (Available -> In Use)
      * @param {Object} data - { asset_id, notes }
      */

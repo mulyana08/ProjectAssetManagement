@@ -13,7 +13,8 @@ import {
     completeRepair,
     disposeAsset,
     relocateAsset,
-    getTransactionsByAsset
+    getTransactionsByAsset,
+    exportTransactions
 } from '../controllers/TransactionController.js';
 import { verifyToken } from '../middleware/VerifyToken.js';
 import { adminOnly, staffAndAdmin } from '../middleware/AuthorizeRole.js';
@@ -25,6 +26,7 @@ router.use(verifyToken);
 
 // Transaction routes - Read
 router.get('/', staffAndAdmin, getTransactions);
+router.get('/export', staffAndAdmin, exportTransactions);
 router.get('/:id', staffAndAdmin, getTransactionById);
 router.get('/asset/:assetId', staffAndAdmin, getTransactionsByAsset);
 
