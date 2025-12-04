@@ -1,8 +1,8 @@
 # 📋 Development Plan - IT Asset Management System
 
-**Versi Dokumen**: 1.4  
+**Versi Dokumen**: 1.5  
 **Tanggal**: 4 Desember 2025  
-**Status**: In Progress - Phase 3 In Progress 🔄
+**Status**: In Progress - AI Chat Feature Phase 1 ✅ 🔄
 
 ---
 
@@ -17,6 +17,7 @@
 7. [Checklist Progress Tracking](#7-checklist-progress-tracking)
 8. [Timeline Estimasi](#8-timeline-estimasi)
 9. [Risiko dan Mitigasi](#9-risiko-dan-mitigasi)
+10. [AI Chat Query Feature](#10-ai-chat-query-feature)
 
 ---
 
@@ -1504,6 +1505,81 @@ Sebelum memulai coding, pastikan hal-hal berikut sudah disetujui:
 4. [ ] **UI/UX Design** - Konfirmasi wireframe/mockup (jika ada)
 5. [ ] **Timeline** - Konfirmasi target waktu pengerjaan
 6. [ ] **Prioritas Fitur** - Konfirmasi fitur mana yang harus selesai duluan
+
+---
+
+## 10. AI Chat Query Feature
+
+### 10.1 Overview
+Fitur AI Chat Query memungkinkan user untuk melakukan query ke database menggunakan natural language (Bahasa Indonesia/English) dengan bantuan Google Gemini 2.0 Flash.
+
+### 10.2 Tech Stack Tambahan
+| Komponen | Package | Versi |
+|----------|---------|-------|
+| AI Model | @google/generative-ai | Latest |
+| Rate Limiting | express-rate-limit | Latest |
+| Model | Gemini 2.0 Flash | - |
+
+### 10.3 Implementation Progress
+
+#### Phase 1: Backend Foundation ✅ COMPLETED (4 Des 2025)
+| Task | File | Status |
+|------|------|--------|
+| Install dependencies | package.json | ✅ |
+| Gemini configuration | `config/gemini.js` | ✅ |
+| Schema context utility | `utils/schemaContext.js` | ✅ |
+| SQL validator | `utils/sqlValidator.js` | ✅ |
+| AI Query Service | `services/AIQueryService.js` | ✅ |
+| Chat Controller | `controllers/ChatController.js` | ✅ |
+| Chat Routes | `routes/ChatRoutes.js` | ✅ |
+| Routes registration | `routes/index.js` | ✅ |
+| Environment config | `.env`, `.env.example` | ✅ |
+
+#### Phase 2: Frontend Chat UI 🔄 PENDING
+| Task | File | Status |
+|------|------|--------|
+| Chat API service | `api/chatAPI.js` | ⏳ |
+| Chat Interface component | `components/chat/ChatInterface.jsx` | ⏳ |
+| Message Bubble component | `components/chat/MessageBubble.jsx` | ⏳ |
+| Query Result component | `components/chat/QueryResult.jsx` | ⏳ |
+| Chat Page | `pages/ChatPage.jsx` | ⏳ |
+| Route & Navigation | `routes/AppRoutes.jsx`, `Sidebar.jsx` | ⏳ |
+
+#### Phase 3: Enhancement 🔄 PENDING
+- [ ] Conversation history/context
+- [ ] Chart visualization for numeric results
+- [ ] Export results to CSV/PDF
+- [ ] Query explanation mode
+
+#### Phase 4: Testing 🔄 PENDING
+- [ ] Unit tests for SQL validator
+- [ ] Integration tests for chat endpoint
+- [ ] Various query scenarios testing
+
+### 10.4 API Endpoints
+
+| Method | Endpoint | Deskripsi | Rate Limit |
+|--------|----------|-----------|------------|
+| POST | `/api/chat` | Send natural language query | 10/min |
+| GET | `/api/chat/suggestions` | Get sample query suggestions | - |
+
+### 10.5 Security Measures
+- ✅ SQL Injection prevention (blocked keywords)
+- ✅ SELECT-only queries (no DDL/DML)
+- ✅ Query timeout (5 seconds)
+- ✅ Row limit (100 rows max)
+- ✅ Rate limiting (10 requests/minute)
+- ✅ Authentication required
+
+### 10.6 Environment Variables
+```env
+GEMINI_API_KEY=your_api_key
+GEMINI_MODEL=gemini-2.0-flash
+CHAT_RATE_LIMIT=10
+CHAT_RATE_WINDOW_MS=60000
+MAX_QUERY_ROWS=100
+QUERY_TIMEOUT_MS=5000
+```
 
 ---
 

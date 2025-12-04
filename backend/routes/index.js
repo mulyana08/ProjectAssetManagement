@@ -9,6 +9,7 @@ import CategoryRoutes from './CategoryRoutes.js';
 import LocationRoutes from './LocationRoutes.js';
 import AssetRoutes from './AssetRoutes.js';
 import TransactionRoutes from './TransactionRoutes.js';
+import ChatRoutes from './ChatRoutes.js';
 
 /**
  * Register all routes to Express app
@@ -25,6 +26,7 @@ const registerRoutes = (app) => {
     app.use(`${apiPrefix}/locations`, LocationRoutes);
     app.use(`${apiPrefix}/assets`, AssetRoutes);
     app.use(`${apiPrefix}/transactions`, TransactionRoutes);
+    app.use(`${apiPrefix}/chat`, ChatRoutes);
 
     // Log registered routes
     console.log('📍 Routes registered:');
@@ -34,6 +36,7 @@ const registerRoutes = (app) => {
     console.log('   /api/locations');
     console.log('   /api/assets');
     console.log('   /api/transactions');
+    console.log('   /api/chat');
 };
 
 export default registerRoutes;
