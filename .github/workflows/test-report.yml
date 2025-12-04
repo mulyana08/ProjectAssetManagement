@@ -1,0 +1,295 @@
+name: Test & Report
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [develop, main]
+
+# Cancel previous runs if new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+
+jobs:
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: itam_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Wait for MySQL
+        run: |
+          until mysqladmin ping -h 127.0.0.1 -u root -proot --silent; do
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+
+      - name: Run tests
+        id: test
+        working-directory: backend
+        env:
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: itam_test
+          DB_PORT: 3306
+          JWT_SECRET: test-secret-key
+          JWT_REFRESH_SECRET: test-refresh-secret
+        run: |
+          npm run test:ci 2>&1 | tee test-output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: |
+            backend/test-results.json
+            backend/test-output.txt
+          retention-days: 7
+
+      - name: Set test status
+        if: steps.test.outputs.exit_code != '0'
+        run: exit 1
+
+  frontend-test:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run lint
+        id: lint
+        working-directory: frontend
+        run: |
+          npm run lint 2>&1 | tee lint-output.txt || true
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Build check
+        id: build
+        working-directory: frontend
+        run: |
+          npm run build 2>&1 | tee build-output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Upload frontend results
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-test-results
+          path: |
+            frontend/lint-output.txt
+            frontend/build-output.txt
+          retention-days: 7
+
+  comment-results:
+    name: Post Test Results
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Download backend results
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-test-results
+          path: backend-results
+        continue-on-error: true
+
+      - name: Download frontend results
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-test-results
+          path: frontend-results
+        continue-on-error: true
+
+      - name: Generate and post comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Helper function to read file safely
+            const readFile = (path) => {
+              try {
+                return fs.readFileSync(path, 'utf8');
+              } catch (e) {
+                return null;
+              }
+            };
+            
+            // Parse backend test results
+            let backendResults = { success: false, summary: 'No results found' };
+            const backendJson = readFile('backend-results/test-results.json');
+            const backendOutput = readFile('backend-results/test-output.txt');
+            
+            if (backendJson) {
+              try {
+                const data = JSON.parse(backendJson);
+                const passed = data.numPassedTests || 0;
+                const failed = data.numFailedTests || 0;
+                const total = data.numTotalTests || 0;
+                const duration = ((data.testResults || []).reduce((acc, r) => acc + (r.endTime - r.startTime), 0) / 1000).toFixed(2);
+                
+                backendResults = {
+                  success: failed === 0,
+                  passed,
+                  failed,
+                  total,
+                  duration,
+                  summary: failed === 0 ? '✅ All tests passed' : `❌ ${failed} test(s) failed`
+                };
+              } catch (e) {
+                backendResults.summary = '⚠️ Could not parse test results';
+              }
+            }
+            
+            // Parse frontend results
+            let frontendResults = { lint: 'N/A', build: 'N/A' };
+            const lintOutput = readFile('frontend-results/lint-output.txt');
+            const buildOutput = readFile('frontend-results/build-output.txt');
+            
+            if (lintOutput) {
+              const hasErrors = lintOutput.includes('error') || lintOutput.includes('Error');
+              frontendResults.lint = hasErrors ? '❌ Lint errors found' : '✅ No lint errors';
+              frontendResults.lintDetails = lintOutput.substring(0, 500);
+            }
+            
+            if (buildOutput) {
+              const buildSuccess = buildOutput.includes('built in') || buildOutput.includes('Build completed');
+              frontendResults.build = buildSuccess ? '✅ Build successful' : '❌ Build failed';
+            }
+            
+            // Generate comment body
+            const backendStatus = backendResults.success ? '✅' : '❌';
+            const overallStatus = backendResults.success ? '✅ All Checks Passed' : '❌ Some Checks Failed';
+            
+            const body = `## 🧪 Test Results Report
+
+            ### Overall Status: ${overallStatus}
+
+            ---
+
+            ### 🔧 Backend Tests
+
+            | Status | Total | Passed | Failed | Duration |
+            |:------:|:-----:|:------:|:------:|:--------:|
+            | ${backendStatus} | ${backendResults.total || '-'} | ${backendResults.passed || '-'} | ${backendResults.failed || '-'} | ${backendResults.duration || '-'}s |
+
+            **Result:** ${backendResults.summary}
+
+            ---
+
+            ### 🎨 Frontend Checks
+
+            | Check | Status |
+            |:------|:------:|
+            | ESLint | ${frontendResults.lint} |
+            | Build | ${frontendResults.build} |
+
+            ---
+
+            <details>
+            <summary>📋 Backend Test Output</summary>
+
+            \`\`\`
+            ${backendOutput ? backendOutput.substring(0, 2000) : 'No output available'}
+            \`\`\`
+
+            </details>
+
+            <details>
+            <summary>📋 Frontend Lint Output</summary>
+
+            \`\`\`
+            ${frontendResults.lintDetails || 'No output available'}
+            \`\`\`
+
+            </details>
+
+            ---
+
+            > 🤖 This comment is automatically generated by GitHub Actions
+            > 📅 Last updated: ${new Date().toISOString()}
+            `.split('\n').map(line => line.trim()).join('\n');
+            
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            
+            const botComment = comments.find(c => 
+              c.user.type === 'Bot' && 
+              c.body.includes('🧪 Test Results Report')
+            );
+            
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body
+              });
+              console.log('Updated existing comment');
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+              console.log('Created new comment');
+            }

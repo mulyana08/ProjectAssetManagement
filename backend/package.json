@@ -7,7 +7,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "seed": "node seeders/seed.js",
-    "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
+    "test": "cross-env NODE_ENV=test node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand",
+    "test:ci": "cross-env NODE_ENV=test CI=true node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --json --outputFile=test-results.json"
   },
   "keywords": ["asset-management", "nodejs", "express", "mysql", "sequelize"],
   "author": "",
