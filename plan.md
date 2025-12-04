@@ -292,7 +292,107 @@ frontend/
 
 ---
 
-## 📱 Browser Compatibility
+## � Project Roadmap & Milestones (Recommended)
+
+This section expands the tactical plan into concrete milestones, timelines, and acceptance criteria so the team can make steady progress from MVP to Production-ready.
+
+Milestone A — MVP (2 weeks)
+- Goal: Stable CRUD for Assets, Categories, Locations, Users, Transactions; basic role-based access; runnable locally and seeded with dummy data.
+- Success criteria:
+  - Backend API endpoints covered for core resources (status 200/201/204 where applicable)
+  - Frontend pages for list/detail/create/update/delete functional and responsive
+  - Seed script installs sample data and documented run steps
+
+Milestone B — Beta (4 weeks)
+- Goal: Improve UX, add import/export, basic reporting, mobile responsiveness, and CI pipeline.
+- Success criteria:
+  - CSV import for assets with validation and preview
+  - Export reports (assets, transactions) as CSV
+  - GitHub Actions build + automated linting
+
+Milestone C — Production (6–8 weeks)
+- Goal: Harden security, add monitoring, automated backups, deployments, and documentation for operations.
+- Success criteria:
+  - HTTPS-ready deployment instructions and scripts (Docker / managed service)
+  - Automated DB backups and migration strategy
+  - Monitoring (Sentry/Prometheus) and alerting configured
+
+Estimated timeline (calendar weeks) — subject to change based on team size and priorities.
+
+## ✅ Acceptance Criteria (per feature)
+- Assets: create/read/update/delete, QR/Barcode generation, asset assignment workflow, and history/audit trail for changes.
+- Transactions: checkout/checkin flows with validation (asset status), user notifications (optional), and export.
+- Role-based Access: admin vs staff behavior validated via tests and manual checks; unauthorized access returns 403.
+- Data Integrity: migrations exist and sample data loads consistently.
+
+## 🧪 QA & Testing Strategy
+
+- Unit Tests (backend): controllers and services for core logic (create/update/validation). Aim for critical path coverage: assets and transactions.
+- Integration Tests: basic API smoke tests for important routes (auth, assets, transactions).
+- Frontend Smoke Tests: one welcome/login + one asset listing + one asset create flow (Cypress/Playwright recommended).
+- Manual QA checklist: cross-browser checks, role-based access, edge cases (empty inputs, large CSV import, concurrent checkouts).
+
+Test data and CI:
+- Use the existing `backend/seeders/dummyData.js` in CI setup for deterministic test data.
+
+## ⚙️ CI/CD Plan
+
+- Git branches: `main` = production-ready; `develop` = active development; feature branches `feature/*`.
+- GitHub Actions workflow:
+  - `lint` job: run ESLint for frontend and backend
+  - `test` job: run backend unit tests + frontend smoke tests
+  - `build` job: build frontend (Vite) and backend (prepare docker image)
+  - `deploy` job: optional, triggered on `main` — publish Docker image or deploy to chosen host
+
+## 📦 Deployment Strategy
+
+- Preferred: Dockerized deployment with environment variables for DB and secrets.
+- Simple alternative: Deploy backend to a process-based host (Heroku/Render) and frontend to static host (Netlify/Vercel) with API URL configured.
+
+Deployment checklist:
+- [ ] Build artifacts produced and verified
+- [ ] Migrations run automatically or via a documented step
+- [ ] Secrets stored in host secret manager
+- [ ] Health check endpoint present and monitored
+
+## 🔍 Monitoring & Observability
+
+- Integrate error tracking (Sentry) for backend and frontend.
+- Expose basic Prometheus metrics (or host metrics) and configure dashboards.
+- Configure uptime/health check and alerting for 5xx rates and DB connectivity.
+
+## 🔐 Security Hardening
+
+- Enforce HTTPS in production
+- Rotate secrets and avoid committing any sensitive values
+- Add rate limiting middleware for public endpoints
+- Harden CORS policies and validate inputs
+
+## 💾 Backups & Database Migrations
+
+- Schedule daily DB backups; retain 7–30 days depending on retention policy
+- Use Sequelize migrations for schema changes; never modify production schema without a migration
+
+## 👩‍💻 Developer Onboarding & Docs
+
+- `README.md`: quickstart, local dev, run seeders, env variables, and testing instructions
+- `CONTRIBUTING.md`: branching model, PR template, code style and review checklist
+
+## ⚠️ Risks & Mitigations
+
+- Risk: CSV import corrupts data — Mitigation: add preview step and validation; sandbox imports first
+- Risk: Role misconfiguration — Mitigation: tests that exercise role-restricted routes and UI
+
+## 📌 Immediate Next Steps (Priority)
+1. Finalize `plan.md` (this change) and commit to `develop` — DONE
+2. Add `README.md` with quickstart and seed instructions — NEXT
+3. Add GitHub Actions CI for lint + build + basic tests — NEXT
+4. Add minimal unit tests for backend critical paths — NEXT
+5. Prepare deployment Dockerfile(s) and docs — FOLLOW-UP
+
+---
+
+## �📱 Browser Compatibility
 
 | Browser | Status |
 |---------|--------|
