@@ -70,22 +70,33 @@ jobs:
           JWT_SECRET: test-secret-key
           JWT_REFRESH_SECRET: test-refresh-secret
         run: |
+          set +e
           npm run test:ci 2>&1 | tee test-output.txt
-          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
-        continue-on-error: true
+          TEST_EXIT_CODE=$?
+          echo "exit_code=$TEST_EXIT_CODE" >> $GITHUB_OUTPUT
+          if [ $TEST_EXIT_CODE -eq 0 ]; then
+            echo "test_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "test_status=failure" >> $GITHUB_OUTPUT
+          fi
+          exit 0
 
       - name: Upload test results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: backend-test-results
           path: |
             backend/test-results.json
             backend/test-output.txt
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Set test status
-        if: steps.test.outputs.exit_code != '0'
-        run: exit 1
+        if: steps.test.outputs.test_status == 'failure'
+        run: |
+          echo "Tests failed with exit code ${{ steps.test.outputs.exit_code }}"
+          exit 1
 
   frontend-test:
     name: Frontend Tests
